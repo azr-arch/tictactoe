@@ -1,3 +1,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+div[data-won-block="true"] {
+  animation-name: shrinkIn;
+  animation-duration: 200ms;
+  animation-fill-mode: forwards;
+}
+
+@keyframes shrinkIn {
+  from {
+    width: 100%;
+    height: 100%;
+  }
+  to {
+    width: 0;
+    height: 0;
+  }
+}

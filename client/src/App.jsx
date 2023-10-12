@@ -13,13 +13,11 @@ import { UserProvider, useUser } from "./context/UserContext";
 
 import PrivateRoute from "./components/PrivateRoute";
 import PublicRoute from "./components/PublicRoute";
+import { LocalStorage } from "./utils";
 
 function App() {
-  const token = localStorage.getItem("token") || null;
+  const token = LocalStorage.get("token") || null;
   const navigate = useNavigate();
-  const { currUser } = useUser;
-
-  console.log(currUser);
 
   // onAuthStateChanged(auth, (user) => {
   //   console.log(user);
@@ -43,7 +41,7 @@ function App() {
               }
             />
 
-            <Route path="/" element={<Play />} />
+            {/* <Route path="/" element={<Play />} /> */}
 
             <Route
               path="/login"

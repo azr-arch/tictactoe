@@ -4,13 +4,22 @@ import { useSocket } from "../context/SocketContext";
 
 import { motion } from "framer-motion";
 
+import { X, O } from "../assets/icon";
+import { LocalStorage } from "../utils";
+
 const StartGame = () => {
   const [userName, setUserName] = useState("");
   const [roomId, setRoomId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState(false); // False  -->  O , True --> X
+  const [createdRoom, setCreatedRoom] = useState();
+
+  const [currPlayer, setCurrPlayer] = useState(
+    LocalStorage.get("user") || null
+  );
 
   const { socket } = useSocket();
-  // console.log(socket)
+
   const [modalOpen, setModalOpen] = useState({
     start: false,
     join: false,
@@ -47,26 +56,43 @@ const StartGame = () => {
   };
 
   const handleCreateRoom = () => {
-    if (!userName) return;
-    localStorage.setItem("username", userName);
+    if (!currPlayer) return alert("please login");
+
     const room = uid();
-    alert(`Copy this room id and share it to your friends: ${room}`);
+    const selectedSymbol = selected ? "x" : "o";
+
+    setLoading(true);
+    // Show the modal with room Id
+    setCreatedRoom(room);
 
     socket.emit("newgame", {
-      userId: socket.id,
-      username: userName,
+      userData: {
+        userId: socket.id,
+        username: currPlayer?.name,
+        profile: currPlayer?.profile,
+      },
       room,
+      playerChose: selectedSymbol,
     });
   };
 
   const handleJoinRoom = () => {
     if (!roomId) return;
-    socket.emit("joingame", roomId);
+    if (!currPlayer) return alert("please login");
+
+    const data = {
+      name: currPlayer?.userName,
+      profile: currPlayer?.profile,
+    };
+    socket.emit("joingame", { room, userData: data });
   };
 
   socket.on("joined", (data) => {
     if (data.success) {
       setLoading(false);
+
+      LocalStorage.set("otherPlayer", data.userData);
+
       navigate(`/play/${data.roomId}`);
     }
     if (data.error) {
@@ -74,8 +100,11 @@ const StartGame = () => {
       alert(data.message);
       navigate("/");
     }
-    setLoading(true);
   });
+
+  const handlesymbolSelection = (e) => {
+    setSelected((prev) => !prev);
+  };
 
   return (
     <motion.div
@@ -85,9 +114,8 @@ const StartGame = () => {
         type: "spring",
         stiffness: 300,
         damping: 20,
-        staggerChildren: 0.2,
       }}
-      className="w-96 flex flex-col items-center gap-4 py-8 text-white bg-black_2 shadow-2xl"
+      className="px-8 md:w-96 flex flex-col items-center gap-4 py-8 text-white bg-black_2 shadow-2xl"
     >
       <motion.div className="text-lg ">Tic Tac Toe</motion.div>
       <div className="flex items-center gap-4">
@@ -109,17 +137,34 @@ const StartGame = () => {
 
       {/* Start Game Modal  */}
       {modalOpen.start && (
-        <div className="p-5 bg-black_2 text-gray gap-4 flex flex-col min-w-[400px] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 rounded-md shadow-lg">
-          <p className="text-lg font-bold mb-2 text-white">
-            Enter your username
-          </p>
-          <input
-            type="text"
-            placeholder="Username"
-            value={userName}
-            onChange={handleUsernameChange}
-            className="p-2 rounded-md bg-gray placeholder-white placeholder:opacity-60 text-white mb-4"
-          />
+        <motion.div
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="p-5 bg-black_2 text-gray gap-4 flex flex-col min-w-[80vw] md:min-w-[400px] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 rounded-md shadow-lg"
+        >
+          <p className="text-lg font-bold mb-2 text-white">Choose</p>
+
+          <div className="flex items-center w-full justify-around gap-4 p-2 my-8">
+            <div
+              data-value="o"
+              onClick={handlesymbolSelection}
+              className={`h-[80px] aspect-square bg-black_1   flex items-center justify-center rounded-sm transition-colors duration-150 ease-out ${
+                !selected ? "outline-white outline" : ""
+              } `}
+            >
+              <O />
+            </div>
+            <div
+              data-value="x"
+              onClick={handlesymbolSelection}
+              className={`h-[80px] aspect-square bg-black_1   flex items-center justify-center rounded-sm  transition-colors duration-150 ease-out${
+                selected ? "outline-white outline" : ""
+              } `}
+            >
+              <X />
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
             <button
               onClick={handleCreateRoom}
@@ -135,12 +180,12 @@ const StartGame = () => {
               Close
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Join Game Modal  */}
       {modalOpen.join && (
-        <div className="p-5 bg-black_2 text-gray gap-4 min-w-[400px] flex flex-col absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 rounded-md shadow-lg">
+        <div className="p-5 bg-black_2 text-gray gap-4 min-w-[80vw] md:min-w-[400px] flex flex-col absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 rounded-md shadow-lg">
           <p className="text-lg font-bold mb-2 text-white">Enter Room Id</p>
           <input
             type="text"
@@ -168,9 +213,13 @@ const StartGame = () => {
       )}
 
       {loading && (
-        <div className="w-screen flex items-center z-50 justify-center h-screen fixed top-0 left-0 bg-black_2 bg-opacity-30">
-          <div className="bg-gray rounde-md p-4 text-white">
-            Please wait for other players to join
+        <div className="w-screen flex items-center z-50 justify-center h-screen  fixed top-0 left-0 bg-black bg-opacity-50">
+          <div className="bg-black_1 rounde-md p-4 text-white text-center">
+            <h2 className="text-xl"> Please wait for other players to join</h2>
+            <p className=" font-medium text-sm mt-4">
+              <span className="mr-2">`{createdRoom}`</span> Share this Room Id,
+              to another player
+            </p>
           </div>
         </div>
       )}

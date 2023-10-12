@@ -35,7 +35,7 @@ io.on("connection", (socket) => {
   socket.on("newgame", (data) => {
     console.log("a new game has been created with roomId: ", data.room);
     socket.join(data.room);
-    roomMap[data.room] = { users: [socket.id] };
+    roomMap[data.room] = { usersId: [socket.id], usersInfo: [data.userData] };
 
     // Wait for another user to join
     socket.emit("joined", {
@@ -44,17 +44,19 @@ io.on("connection", (socket) => {
     });
   });
 
-  socket.on("joingame", (roomId) => {
-    if (roomMap[roomId] && roomMap[roomId].users.length < 2) {
-      socket.join(roomId);
-      roomMap[roomId].users.push(socket.id);
-      console.log(`${socket.username} wants to join room: ${roomId}`);
-      socket.broadcast.emit("user-joined", socket.username);
+  socket.on("joingame", (data) => {
+    if (roomMap[data.room] && roomMap[data.room].users.length < 2) {
+      socket.join(data.room);
+      roomMap[data.room].usersId.push(socket.id);
+      roomMap[data.room].usersInfo.push(data.userData);
+
+      console.log(`${socket.username} wants to join room: ${data.room}`);
 
       io.to(roomId).emit("joined", {
         success: true,
         message: "Game Started",
         roomId,
+        userData: data.userData,
       });
     } else {
       socket.emit("joined", {

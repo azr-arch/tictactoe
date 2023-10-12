@@ -7,8 +7,7 @@ import { auth } from "../config/firebase";
 
 import { motion } from "framer-motion";
 
-import XIcon from "../assets/X.svg";
-import circleIcon from "../assets/circle.svg";
+import { X, O } from "../assets/icon"; // Game symbold
 
 const initialBoardState = ["", "", "", "", "", "", "", "", ""]; // TODO - use reducer for this component
 const Play = () => {
@@ -21,6 +20,7 @@ const Play = () => {
   const { socket } = useSocket();
   // const navigate = useNavigate();
   // let winner = calculateWinner(board);
+  const boardRef = useRef();
 
   socket.on("user-joined", (data) => {
     console.log("a user has joined your room ", socket.username);
@@ -30,21 +30,21 @@ const Play = () => {
     const newBoard = [...board];
     const currPos = e.target.dataset.position;
 
-    console.log("handleClick working!");
-    console.log(currPos);
     if (!newBoard[currPos]) {
       const currentPlayer = isX ? "x" : "o";
       newBoard[currPos] = currentPlayer;
       setBoard(newBoard);
       setIsX(!isX);
-
-      console.log(newBoard);
       const won = calculateWinner(newBoard);
 
       if (won) {
+        addWinningEffect(won);
+
         socket.emit("winner", { board: newBoard, playerWon: currentPlayer });
         console.log("winner is declared!: ", currentPlayer);
-        setWinner(true);
+        setTimeout(() => {
+          setWinner(true);
+        }, 100);
         return;
       } else {
         socket.emit("move", { board: newBoard, player: currentPlayer, roomId });
@@ -54,7 +54,7 @@ const Play = () => {
   }
 
   function calculateWinner(board) {
-    // Lines are the possible winning combinations
+    // Possible winning combinations
     const lines = [
       [0, 1, 2],
       [3, 4, 5],
@@ -71,7 +71,7 @@ const Play = () => {
 
       // Check if the elements in the line are the same (and not null)
       if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-        return board[a];
+        return lines[i];
       }
     }
 
@@ -110,37 +110,20 @@ const Play = () => {
     setBoard(initialBoardState);
   };
 
-  const GameSymbolVariant = {
-    initial: {
-      scale: 0,
-      opacity: 0,
-    },
-    animate: {
-      scale: 1,
-      opacity: 1,
-    },
-  };
-
-  const X = (
-    <motion.div
-      variants={GameSymbolVariant}
-      initial="initial"
-      animate="animate"
-      className="w-36 h-36"
-    >
-      <img src={XIcon} className="w-full h-full" />
-    </motion.div>
-  );
-  const O = (
-    <motion.div
-      variants={GameSymbolVariant}
-      initial="initial"
-      animate="animate"
-      className="w-12 h-12"
-    >
-      <img src={circleIcon} className="w-full h-full" />
-    </motion.div>
-  );
+  function addWinningEffect(indexArr) {
+    // Function to add winning effects when a player has won
+    let cells = Array.from(
+      boardRef.current.querySelectorAll("[data-position]")
+    ); // Coverting to array because NodeList doesnt have .find
+    console.log(cells);
+    indexArr.forEach((position, idx) => {
+      console.log(position);
+      let item = cells.find((cell) => cell.dataset.position == position);
+      if (item) {
+        item.setAttribute("data-won-block", true);
+      }
+    });
+  }
 
   return (
     // <div className="flex flex-col items-center">
@@ -177,30 +160,35 @@ const Play = () => {
 
       <div className="flex flex-col items-center">
         {/* Game Board  */}
-        <div className="grid grid-cols-3 gap-4 bg-black_2 p-4 rounded-md">
-          {!winner ? (
-            board.map((cell, idx) => (
+        {!winner ? (
+          <div
+            className="grid grid-cols-3 gap-4 place-items-center justify-center bg-black_2 p-4 rounded-md"
+            ref={boardRef}
+          >
+            {board.map((cell, idx) => (
               <div
                 key={idx}
                 data-position={idx}
                 onClick={handleCellClick}
                 className="p-2 rounded-sm bg-black_1 flex items-center justify-center h-20 w-20"
               >
-                {cell === "x" ? X : cell === "o" ? O : ""}
+                {cell === "x" ? <X /> : cell === "o" ? <O /> : ""}
               </div>
-            ))
-          ) : (
-            <div className="p-5 flex flex-col">
-              <p>Player {isX ? "X" : "O"} has won the game</p>
-              <button
-                onClick={handleRestart}
-                className="rounded-sm bg-blue_1 px-4 py-2 text-white"
-              >
-                Restart the game
-              </button>
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-5 flex flex-col">
+            <p className="text-white mb-4">
+              Player {isX ? "X" : "O"} has won the game
+            </p>
+            <button
+              onClick={handleRestart}
+              className="rounded-sm bg-blue_1 px-4 py-2 text-white"
+            >
+              Restart the game
+            </button>
+          </div>
+        )}
       </div>
     </>
   );

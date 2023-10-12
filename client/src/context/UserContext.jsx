@@ -6,8 +6,8 @@ const UserContext = createContext({});
 const useUser = () => useContext(UserContext);
 
 const UserProvider = ({ children }) => {
-  const [currUser, setCurrUser] = useState(null);
-  const [token, setToken] = useState(null);
+  const [currUser, setCurrUser] = useState(LocalStorage.get("user") || null);
+  const [token, setToken] = useState(LocalStorage.get("token") || null);
 
   const handleSet = (tokenValue, userValue) => {
     // this function lets us not to expost setCurr and setToken
@@ -19,6 +19,7 @@ const UserProvider = ({ children }) => {
     setCurrUser(LocalStorage.get("user"));
     setToken(LocalStorage.get("token"));
   }, []);
+
   return (
     <UserContext.Provider value={{ currUser, token, handleSet }}>
       {children}

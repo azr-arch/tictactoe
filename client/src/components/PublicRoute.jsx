@@ -9,7 +9,7 @@ const PublicRoute = ({ children }) => {
   // console.log(token, currUser["_id"]);
   // If there is a valid token and user ID, navigate the user to the chat page
   if (token && currUser?._id) {
-    <Navigate to="/" replace />;
+    return <Navigate to="/" replace />;
   }
   // If no token or user ID exists, render the child components as they are
   return children;

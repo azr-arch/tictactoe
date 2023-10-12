@@ -11,7 +11,7 @@ const PrivateRoute = ({ children }) => {
   const { token, currUser } = useUser();
 
   // If there's no token or user ID, redirect to the login page
-  if (!token || !currUser?._id) <Navigate to="/login" replace />;
+  if (!token || !currUser?._id) return <Navigate to="/login" replace />;
 
   // If authenticated, render the child components
   return children;
