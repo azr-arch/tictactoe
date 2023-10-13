@@ -34,7 +34,6 @@ const Login = () => {
 
         handleSet(token, userObj);
 
-        // console.log(<Navigate />);
         return <Navigate to={"/"} replace />;
       })
       .catch((error) => {

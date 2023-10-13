@@ -1,4 +1,4 @@
-import React, { useReducer, useRef, useState } from "react";
+import React, { useEffect, useReducer, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
 import { signOut } from "firebase/auth";
@@ -9,24 +9,43 @@ import { motion } from "framer-motion";
 
 import { X, O } from "../assets/icon"; // Game symbold
 
-const initialBoardState = ["", "", "", "", "", "", "", "", ""]; // TODO - use reducer for this component
+const initialBoardState = Array(9).fill(null); // TODO - use reducer for this component
 const Play = () => {
   const [board, setBoard] = useState(initialBoardState);
   const [isX, setIsX] = useState(true);
   const [winner, setWinner] = useState(null);
-  // const[currentPlayer, SetCurrentPlayer]
-  const { roomId } = useParams();
+  const [isDraw, setIsDraw] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
 
+  const [yourTurn, setYourTurn] = useState(false);
+
+  const { roomId } = useParams();
   const { socket } = useSocket();
-  // const navigate = useNavigate();
-  // let winner = calculateWinner(board);
+
+  useEffect(() => {
+    if (winner || isDraw) {
+      setGameOver(true);
+    }
+  }, [winner, isDraw]);
+
+  useEffect(() => {
+    const symbols = LocalStorage.get("symbols");
+
+    if (symbols.you === "x") {
+      setYourTurn(true);
+    }
+  }, []);
+
   const boardRef = useRef();
 
-  socket.on("user-joined", (data) => {
-    console.log("a user has joined your room ", socket.username);
-  });
+  // socket.on("user-joined", (data) => {
+  //   console.log("a user has joined your room ", socket.username);
+  // });
 
   function handleCellClick(e) {
+    if (gameOver) return;
+    if (!yourTurn) return;
+
     const newBoard = [...board];
     const currPos = e.target.dataset.position;
 
@@ -35,17 +54,23 @@ const Play = () => {
       newBoard[currPos] = currentPlayer;
       setBoard(newBoard);
       setIsX(!isX);
-      const won = calculateWinner(newBoard);
+      setYourTurn((prev) => !prev);
 
+      const won = calculateWinner(newBoard);
+      const draw = checkDraw(newBoard);
+      console.log(draw);
       if (won) {
+        setGameOver(true);
         addWinningEffect(won);
 
         socket.emit("winner", { board: newBoard, playerWon: currentPlayer });
         console.log("winner is declared!: ", currentPlayer);
         setTimeout(() => {
           setWinner(true);
-        }, 100);
+        }, 1000);
         return;
+      } else if (draw) {
+        setIsDraw(true);
       } else {
         socket.emit("move", { board: newBoard, player: currentPlayer, roomId });
         return;
@@ -78,10 +103,41 @@ const Play = () => {
     return null;
   }
 
+  function checkDraw(board) {
+    return board.every((cell) => cell !== null);
+  }
   socket.on("move", (data) => {
     setBoard(data.board);
     setIsX(data.player !== "X");
   });
+
+  const handleLogout = () => {
+    LocalStorage.clear();
+    console.log("loggin out!");
+    signOut(auth);
+  };
+
+  const handleRestart = () => {
+    console.log("click");
+    setBoard(initialBoardState);
+    setGameOver(false);
+    setWinner(null);
+    setIsX(true);
+    setIsDraw(false);
+  };
+
+  function addWinningEffect(indexArr) {
+    // Function to add winning effects when a player has won
+    let cells = Array.from(
+      boardRef.current.querySelectorAll("[data-position]")
+    ); // Coverting to array because NodeList doesnt have .find
+    indexArr.forEach((position, idx) => {
+      let item = cells.find((cell) => cell.dataset.position == position);
+      if (item) {
+        item.setAttribute("data-won-block", true); // In index.css animation is added using data-won-block attribute
+      }
+    });
+  }
 
   const player = {
     player1: {
@@ -98,58 +154,7 @@ const Play = () => {
     },
   };
 
-  const handleLogout = () => {
-    LocalStorage.clear();
-    console.log("loggin out!");
-    signOut(auth);
-  };
-
-  const handleRestart = () => {
-    setWinner(null);
-    setIsX(true);
-    setBoard(initialBoardState);
-  };
-
-  function addWinningEffect(indexArr) {
-    // Function to add winning effects when a player has won
-    let cells = Array.from(
-      boardRef.current.querySelectorAll("[data-position]")
-    ); // Coverting to array because NodeList doesnt have .find
-    console.log(cells);
-    indexArr.forEach((position, idx) => {
-      console.log(position);
-      let item = cells.find((cell) => cell.dataset.position == position);
-      if (item) {
-        item.setAttribute("data-won-block", true);
-      }
-    });
-  }
-
   return (
-    // <div className="flex flex-col items-center">
-    //   <p className="mb-5">{isX ? "X's Turn" : "O's Turn"}</p>
-    //   {winner && alert(`${winner} won the game`)}
-
-    //   {!winner && (
-    //     <>
-    //       <p className="mb-5">{isX ? "X's Turn" : "O's Turn"}</p>
-    //       <div className="grid grid-cols-3 gap-2">
-    //         {board.map((cell, idx) => {
-    //           return (
-    //             <button
-    //               key={idx}
-    //               onClick={handleCellClick}
-    //               data-position={idx}
-    //               className="w-12 aspect-square rounded-sm bg-black text-white flex items-center justify-center  shadow-sm"
-    //             >
-    //               {cell}
-    //             </button>
-    //           );
-    //         })}
-    //       </div>
-    //     </>
-    //   )}
-    // </div>
     <>
       <button
         className="fixed top-8 right-10 px-4 py-2 rounded-md bg-blue_1 text-white bg-opacity-50"
@@ -158,10 +163,63 @@ const Play = () => {
         Logout
       </button>
 
-      <div className="flex flex-col items-center">
+      <motion.div className="flex flex-col items-center gap-8">
+        <motion.div
+          initial={{ y: -1000, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="relative flex items-center p-2 justify-between w-full bg-black_2"
+        >
+          <div className="grid grid-cols-2 p-3 gap-2 rounded-sm">
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2">
+                <img
+                  src="https://th.bing.com/th/id/OIP.NqY3rNMnx2NXYo3KJfg43gHaHa?w=178&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7"
+                  alt="profile"
+                  className="object-contain w-11 aspect-square rounded-md"
+                />
+                <X size="small" />
+              </div>
+              <p className="text-blue_1 text-sm font-medium">
+                {player.player1.name}
+              </p>
+            </div>
+            <div className=" text-white w-12 aspect-square p-2 flex items-center justify-center">
+              <span className="text-4xl  ">0</span>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="absolute w-[1px] h-5/6 left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 bg-white"></div>
+
+          <div className="grid grid-cols-2  place-content-center  p-3 gap-2 rounded-sm">
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-3 flex-row-reverse ">
+                <img
+                  src="https://th.bing.com/th/id/OIP.NqY3rNMnx2NXYo3KJfg43gHaHa?w=178&h=180&c=7&r=0&o=5&dpr=1.3&pid=1.7"
+                  alt="profile"
+                  className="object-contain w-11 aspect-square rounded-md"
+                />
+                <O size="small" />
+              </div>
+              <p className="text-blue_1 text-sm font-medium">
+                {player.player1.name}
+              </p>
+            </div>
+            <div className="relative text-white w-12 aspect-square p-2 flex items-center justify-center">
+              <span className="text-4xl absolute top-1/2 -translate-y-1/2">
+                0
+              </span>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Game Board  */}
-        {!winner ? (
-          <div
+        {!winner && !isDraw ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ staggerChildren: 0.5 }}
             className="grid grid-cols-3 gap-4 place-items-center justify-center bg-black_2 p-4 rounded-md"
             ref={boardRef}
           >
@@ -175,11 +233,17 @@ const Play = () => {
                 {cell === "x" ? <X /> : cell === "o" ? <O /> : ""}
               </div>
             ))}
-          </div>
-        ) : (
-          <div className="p-5 flex flex-col">
+          </motion.div>
+        ) : null}
+
+        {winner ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-5 flex flex-col"
+          >
             <p className="text-white mb-4">
-              Player {isX ? "X" : "O"} has won the game
+              Player {isX ? "O" : "X"} has won the game
             </p>
             <button
               onClick={handleRestart}
@@ -187,9 +251,25 @@ const Play = () => {
             >
               Restart the game
             </button>
-          </div>
-        )}
-      </div>
+          </motion.div>
+        ) : null}
+
+        {isDraw ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-5 flex flex-col"
+          >
+            <p className="text-white mb-4 text-center">Darn it!, Its a Draw</p>
+            <button
+              onClick={handleRestart}
+              className="rounded-sm bg-blue_1 px-4 py-2 text-white"
+            >
+              Restart the game
+            </button>
+          </motion.div>
+        ) : null}
+      </motion.div>
     </>
   );
 };

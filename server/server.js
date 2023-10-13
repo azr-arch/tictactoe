@@ -44,6 +44,7 @@ io.on("connection", (socket) => {
     });
   });
 
+  // Joining a Room
   socket.on("joingame", (data) => {
     if (roomMap[data.room] && roomMap[data.room].users.length < 2) {
       socket.join(data.room);

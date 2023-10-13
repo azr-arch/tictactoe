@@ -36,12 +36,10 @@ function App() {
               path="/"
               element={
                 <PrivateRoute>
-                  <Play />
+                  <StartGame />
                 </PrivateRoute>
               }
             />
-
-            {/* <Route path="/" element={<Play />} /> */}
 
             <Route
               path="/login"

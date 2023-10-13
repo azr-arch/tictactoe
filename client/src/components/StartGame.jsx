@@ -65,6 +65,11 @@ const StartGame = () => {
     // Show the modal with room Id
     setCreatedRoom(room);
 
+    LocalStorage.set("symbols", {
+      you: selectedSymbol,
+      other: selectedSymbol === "x" ? "o" : "x",
+    });
+
     socket.emit("newgame", {
       userData: {
         userId: socket.id,
@@ -72,7 +77,6 @@ const StartGame = () => {
         profile: currPlayer?.profile,
       },
       room,
-      playerChose: selectedSymbol,
     });
   };
 

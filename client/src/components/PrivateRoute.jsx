@@ -9,7 +9,7 @@ import { useUser } from "../context/UserContext";
 const PrivateRoute = ({ children }) => {
   // Destructure token and user details from the authentication context
   const { token, currUser } = useUser();
-
+  console.log("private route trigerring");
   // If there's no token or user ID, redirect to the login page
   if (!token || !currUser?._id) return <Navigate to="/login" replace />;
 
