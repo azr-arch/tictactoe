@@ -88,7 +88,8 @@ const StartGame = () => {
       name: currPlayer?.userName,
       profile: currPlayer?.profile,
     };
-    socket.emit("joingame", { room, userData: data });
+
+    socket.emit("joingame", { room: roomId, userData: data });
   };
 
   socket.on("joined", (data) => {

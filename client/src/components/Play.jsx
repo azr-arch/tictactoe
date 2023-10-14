@@ -12,7 +12,6 @@ import { X, O } from "../assets/icon"; // Game symbold
 const initialBoardState = Array(9).fill(null); // TODO - use reducer for this component
 const Play = () => {
   const [board, setBoard] = useState(initialBoardState);
-  const [isX, setIsX] = useState(true);
   const [winner, setWinner] = useState(null);
   const [isDraw, setIsDraw] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -21,6 +20,7 @@ const Play = () => {
 
   const { roomId } = useParams();
   const { socket } = useSocket();
+  const symbols = LocalStorage.get("symbols");
 
   useEffect(() => {
     if (winner || isDraw) {
@@ -29,18 +29,16 @@ const Play = () => {
   }, [winner, isDraw]);
 
   useEffect(() => {
-    const symbols = LocalStorage.get("symbols");
+    console.log(symbols);
 
     if (symbols.you === "x") {
       setYourTurn(true);
     }
+
+    socket.emit("start", { youStart: !yourTurn, roomId });
   }, []);
 
   const boardRef = useRef();
-
-  // socket.on("user-joined", (data) => {
-  //   console.log("a user has joined your room ", socket.username);
-  // });
 
   function handleCellClick(e) {
     if (gameOver) return;
@@ -50,11 +48,11 @@ const Play = () => {
     const currPos = e.target.dataset.position;
 
     if (!newBoard[currPos]) {
-      const currentPlayer = isX ? "x" : "o";
-      newBoard[currPos] = currentPlayer;
+      newBoard[currPos] = symbols.you;
       setBoard(newBoard);
-      setIsX(!isX);
-      setYourTurn((prev) => !prev);
+      setYourTurn(false);
+
+      socket.emit("move", { board: newBoard, player: symbols.you, roomId });
 
       const won = calculateWinner(newBoard);
       const draw = checkDraw(newBoard);
@@ -63,17 +61,19 @@ const Play = () => {
         setGameOver(true);
         addWinningEffect(won);
 
-        socket.emit("winner", { board: newBoard, playerWon: currentPlayer });
-        console.log("winner is declared!: ", currentPlayer);
+        socket.emit("winner", {
+          board: newBoard,
+          playerWon: symbols.you,
+          roomId,
+          wonArray: won,
+        });
+        console.log("winner is declared!: ", symbols.you);
         setTimeout(() => {
           setWinner(true);
         }, 1000);
         return;
       } else if (draw) {
         setIsDraw(true);
-      } else {
-        socket.emit("move", { board: newBoard, player: currentPlayer, roomId });
-        return;
       }
     }
   }
@@ -108,29 +108,37 @@ const Play = () => {
   }
   socket.on("move", (data) => {
     setBoard(data.board);
-    setIsX(data.player !== "X");
+    setYourTurn(true);
   });
 
   const handleLogout = () => {
-    LocalStorage.clear();
-    console.log("loggin out!");
-    signOut(auth);
+    // LocalStorage.clear();
+    // console.log("loggin out!");
+    // signOut(auth);
+    console.log("logout");
+    socket.emit("logout", { roomId });
   };
 
   const handleRestart = () => {
-    console.log("click");
     setBoard(initialBoardState);
     setGameOver(false);
     setWinner(null);
-    setIsX(true);
     setIsDraw(false);
+
+    // Emit a 'restart' event to the server
+    socket.emit("restart", { roomId });
   };
 
-  function addWinningEffect(indexArr) {
+  function addWinningEffect(indexArr, givenBoard = null) {
+    console.log(indexArr);
+    console.log(boardRef);
     // Function to add winning effects when a player has won
-    let cells = Array.from(
-      boardRef.current.querySelectorAll("[data-position]")
-    ); // Coverting to array because NodeList doesnt have .find
+    let cells;
+    if (boardRef.current) {
+      cells = Array.from(boardRef.current.querySelectorAll("[data-position]")); // Coverting to array because NodeList doesnt have .find
+    } else {
+      cells = Array.from(givenBoard.querySelectorAll("[data-position]"));
+    }
     indexArr.forEach((position, idx) => {
       let item = cells.find((cell) => cell.dataset.position == position);
       if (item) {
@@ -154,6 +162,23 @@ const Play = () => {
     },
   };
 
+  socket.on("restart", () => {
+    console.log("restart event");
+    setBoard(initialBoardState);
+    setGameOver(false);
+    setWinner(null);
+    setIsDraw(false);
+  });
+
+  socket.on("winner", (data) => {
+    console.log("winner event ", data);
+    addWinningEffect(data.wonArray, data.board);
+    setGameOver(true);
+    setTimeout(() => {
+      setWinner(data.playerWon === symbols.you);
+    }, 1000);
+  });
+
   return (
     <>
       <button
@@ -161,6 +186,13 @@ const Play = () => {
         onClick={handleLogout}
       >
         Logout
+      </button>
+
+      <button
+        className="fixed top-28 right-10 px-4 py-2 rounded-md bg-blue_1 text-white bg-opacity-50"
+        onClick={handleRestart}
+      >
+        Restart
       </button>
 
       <motion.div className="flex flex-col items-center gap-8">
@@ -243,7 +275,7 @@ const Play = () => {
             className="p-5 flex flex-col"
           >
             <p className="text-white mb-4">
-              Player {isX ? "O" : "X"} has won the game
+              {winner ? symbols.you : symbols.other} has won the game
             </p>
             <button
               onClick={handleRestart}

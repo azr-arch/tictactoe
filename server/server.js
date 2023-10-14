@@ -26,14 +26,9 @@ app.get("/", (req, res) => {
 //Event handlers
 
 io.on("connection", (socket) => {
-  console.log("a user is connected : ", socket.id);
-
-  socket.on("disconnect", (socket) => {
-    console.log("user disconnect: ", socket.id);
-  });
+  socket.on("disconnect", (socket) => {});
 
   socket.on("newgame", (data) => {
-    console.log("a new game has been created with roomId: ", data.room);
     socket.join(data.room);
     roomMap[data.room] = { usersId: [socket.id], usersInfo: [data.userData] };
 
@@ -46,17 +41,15 @@ io.on("connection", (socket) => {
 
   // Joining a Room
   socket.on("joingame", (data) => {
-    if (roomMap[data.room] && roomMap[data.room].users.length < 2) {
+    if (roomMap[data.room] && roomMap[data.room].usersId.length < 2) {
       socket.join(data.room);
       roomMap[data.room].usersId.push(socket.id);
       roomMap[data.room].usersInfo.push(data.userData);
 
-      console.log(`${socket.username} wants to join room: ${data.room}`);
-
-      io.to(roomId).emit("joined", {
+      io.to(data.room).emit("joined", {
         success: true,
         message: "Game Started",
-        roomId,
+        roomId: data.room,
         userData: data.userData,
       });
     } else {
@@ -68,15 +61,32 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("start", (data) => {
+    console.log("Received start event", data);
+    socket.to(data.roomId).emit("start", data.youStart);
+  });
+
+  socket.on("restart", (data) => {
+    console.log("Received restart event", data);
+    socket.to(data.roomId).emit("restart");
+  });
+
   socket.on("move", (data) => {
+    console.log("Received move event", data);
     const board = data.board;
     const roomId = data.roomId;
     const player = data.player;
-
-    if (roomMap[roomId] && roomMap[roomId].users.includes(socket.id)) {
+    if (roomMap[roomId] && roomMap[roomId].usersId.includes(socket.id)) {
       socket.to(roomId).emit("move", { board, player });
     }
   });
+
+  socket.on("winner", (data) => {
+    console.log("Received winner event", data);
+    socket.to(data.roomId).emit("winner", data);
+  });
+
+  socket.on("logout", () => {});
 });
 
 httpServer.listen(8080, () => {

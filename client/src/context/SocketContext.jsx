@@ -12,6 +12,7 @@ const SocketProvider = ({ children }) => {
     const newSocket = io("http://localhost:8080", {
       transports: ["websocket"],
       reconnectionAttempts: 3,
+      protocols: ["echo-protocol"],
     }).connect();
     setSocket(newSocket);
     return () => newSocket.close();
