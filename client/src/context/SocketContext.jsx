@@ -6,27 +6,30 @@ const SocketContext = createContext({});
 const useSocket = () => useContext(SocketContext);
 
 const SocketProvider = ({ children }) => {
-  const [socket, setSocket] = useState(null);
+    const [socket, setSocket] = useState(null);
+    const [isConnected, setIsConnected] = useState(false);
 
-  useEffect(() => {
-    const newSocket = io("http://localhost:8080", {
-      transports: ["websocket"],
-      reconnectionAttempts: 3,
-      protocols: ["echo-protocol"],
-    }).connect();
-    setSocket(newSocket);
-    return () => newSocket.close();
-  }, []);
+    useEffect(() => {
+        const newSocket = io("http://localhost:8080", {
+            transports: ["websocket"],
+            reconnectionAttempts: 3,
+            protocols: ["echo-protocol"],
+        }).connect();
 
-  if (!socket) {
-    return <p>Loading...</p>;
-  }
+        newSocket.on("connect", () => setIsConnected(true));
+        setSocket(newSocket);
+        return () => {
+            newSocket.close();
+        };
+    }, []);
 
-  return (
-    <SocketContext.Provider value={{ socket }}>
-      {children}
-    </SocketContext.Provider>
-  );
+    if (!socket) {
+        return null;
+    }
+
+    return (
+        <SocketContext.Provider value={{ socket, isConnected }}>{children}</SocketContext.Provider>
+    );
 };
 
 export { SocketProvider, useSocket };
